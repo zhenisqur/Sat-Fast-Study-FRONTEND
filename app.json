@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "SAT GG",
+    "slug": "sat-gg",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#6A5ACD"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#6A5ACD"
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "@react-native-google-signin/google-signin",
+      "expo-localization",
+      "expo-video",
+      "expo-secure-store",
+      "expo-status-bar"
+    ]
+  }
+}
