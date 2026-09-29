@@ -9,12 +9,14 @@
       "backgroundColor": "#6A5ACD"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.satgg.app"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#6A5ACD"
-      }
+      },
+      "package": "com.satgg.app"
     },
     "web": {
       "bundler": "metro"

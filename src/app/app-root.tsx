@@ -2,6 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { BottomTabs } from '../components/bottom-tabs';
 import { DEMO_MODE } from '../core/config';
 import { ThemeProvider, useTheme } from '../core/theme-context';
@@ -13,11 +14,17 @@ import { DashboardScreen } from '../features/dashboard/dashboard-screen';
 import { PracticeLanding, PracticeSession } from '../features/practice/practice-flow';
 import { ProfileScreen } from '../features/profile/profile-screen';
 import { StudyLesson, StudyPath } from '../features/study/study-flow';
-import { ApiError, authenticate, createApi } from '../services/api';
+import { ApiError, authenticate, createApi, oauthAuthenticate } from '../services/api';
 import { sessionStore } from '../services/session';
 
 type Overlay = { kind: 'PRACTICE'; section: Section } | { kind: 'LESSON'; level: number } | null;
-const defaultProgress: Progress = { math: { level: 0, of: 42 }, readingWriting: { level: 0, of: 42 }, overall: { level: 0, of: 84 } };
+const defaultProgress: Progress = { math: { level: 0, of: 50 }, readingWriting: { level: 0, of: 50 }, overall: { level: 0, of: 100 } };
+
+// Web Client ID из Google Cloud Console — тот же, что прописан в GOOGLE_CLIENT_ID
+// на бэке в .env (backend проверяет idToken именно этим client id).
+GoogleSignin.configure({
+  webClientId: '1049784473594-84e7qgofperqa9mebtiet8chid54vik4.apps.googleusercontent.com',
+});
 
 export default function AppRoot() {
   return (
@@ -90,23 +97,49 @@ function AppRootInner() {
   }, [refreshDashboard]);
 
   const handleAuth = async (mode: 'LOGIN' | 'REGISTER', payload: AuthPayload) => {
-  const next = await authenticate(mode, payload);
-  await sessionStore.save(next);
-  setSession(next);
-  // Ответ /auth/login и /auth/register содержит только id/email/role —
-  // сразу дозапрашиваем полный профиль (fullName, age и т.д.), иначе
-  // Dashboard упадёт на user.fullName сразу после логина.
-  try {
-    const fullProfile = await createApi(next.accessToken, signOut).getProfile();
-    setSession({ ...next, user: fullProfile });
-  } catch {
-    // не критично — Dashboard всё равно перезапросит профиль при следующем refreshUser
-  }
-};
-  const handleOAuthPress = async (provider: 'GOOGLE' | 'APPLE') => {
-    // TODO: подключить реальный OAuth-флоу (нативный sign-in + обмен токена на бэке)
-    throw new Error(`${provider} sign-in ещё не реализован.`);
+    const next = await authenticate(mode, payload);
+    await sessionStore.save(next);
+    setSession(next);
+    // Ответ /auth/login и /auth/register содержит только id/email/role —
+    // сразу дозапрашиваем полный профиль (fullName, age и т.д.), иначе
+    // Dashboard упадёт на user.fullName сразу после логина.
+    try {
+      const fullProfile = await createApi(next.accessToken, signOut).getProfile();
+      setSession({ ...next, user: fullProfile });
+    } catch {
+      // не критично — Dashboard всё равно перезапросит профиль при следующем refreshUser
+    }
   };
+
+  // Открывает нативный пикер аккаунта Google, получает idToken, шлёт на /auth/google.
+  // Требует dev-build — не работает в обычном Expo Go (нативный модуль).
+  const handleGoogleAuth = async () => {
+    await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
+    const userInfo = await GoogleSignin.signIn();
+    const idToken = userInfo.data?.idToken;
+    if (!idToken) throw new Error('Google did not return an ID token.');
+
+    const next = await oauthAuthenticate('GOOGLE', { idToken });
+    await sessionStore.save(next);
+    setSession(next);
+  };
+
+  const handleOAuthPress = async (provider: 'GOOGLE' | 'APPLE') => {
+    try {
+      if (provider === 'GOOGLE') {
+        await handleGoogleAuth();
+      } else {
+        throw new Error('Apple sign-in ещё не подключён.');
+      }
+    } catch (caught: any) {
+      // Пользователь просто закрыл окно выбора аккаунта — не показываем это как ошибку
+      if (caught?.code === statusCodes.SIGN_IN_CANCELLED) {
+        return;
+      }
+      throw caught instanceof Error ? caught : new Error('Sign-in failed. Please try again.');
+    }
+  };
+
   const refreshUser = async () => {
     if (!api || !session) return;
     try {
