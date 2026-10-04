@@ -1,18 +1,23 @@
 import { StatusBar } from 'expo-status-bar';
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeProvider, useTheme } from '../core/theme-context';
 import { LanguageProvider } from '../core/language-context';
 import { ThemeColors } from '../core/theme';
 import { Section, Tab } from '../core/types';
 import { AuthScreen } from '../features/auth/auth-screen';
+import { OnboardingFlow } from '../features/onboarding/OnboardingFlow';
+import { OnboardingAnswers } from '../features/onboarding/types';
 import { createApi } from '../services/api';
 import { useSession } from '../hooks/useSession';
 import { useDashboardData } from '../hooks/useDashboardData';
 import { MainNavigator } from './MainNavigator';
 
 type Overlay = { kind: 'PRACTICE'; section: Section } | { kind: 'LESSON'; level: number } | null;
+
+const ONBOARDING_DONE_KEY = 'sat_gg_onboarding_done';
 
 export default function AppRoot() {
   return (
@@ -38,6 +43,22 @@ function AppRootInner() {
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [studyVersion, setStudyVersion] = useState(0);
 
+  // null = ещё не проверили AsyncStorage, true/false = проверили
+  const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
+  const [onboardingAnswers, setOnboardingAnswers] = useState<OnboardingAnswers | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_DONE_KEY).then((value) => setOnboardingDone(value === 'true'));
+  }, []);
+
+  const handleOnboardingComplete = async (answers: OnboardingAnswers) => {
+    setOnboardingAnswers(answers);
+    // TODO: когда появится бэкенд-эндпоинт — отправить answers одним batch-запросом
+    // сразу после первой успешной регистрации (см. архитектурное решение по онбордингу)
+    await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
+    setOnboardingDone(true);
+  };
+
   const refreshUser = async () => {
     if (!api || !session) return;
     try {
@@ -45,7 +66,8 @@ function AppRootInner() {
     } catch {}
   };
 
-  if (booting) return <Splash colors={colors} />;
+  if (booting || onboardingDone === null) return <Splash colors={colors} />;
+  if (!onboardingDone) return <OnboardingFlow onComplete={handleOnboardingComplete} />;
   if (!session) return <AuthScreen onAuthenticate={handleAuth} onOAuthPress={handleOAuthPress} />;
   if (!api) return null;
 
@@ -69,7 +91,9 @@ function Splash({ colors }: { colors: ThemeColors }) {
   return (
     <SafeAreaView style={styles.splash} edges={['top', 'left', 'right']}>
       <StatusBar style="light" />
-      <View style={styles.mark}><Text style={styles.markText}>S</Text></View>
+      <View style={styles.mark}>
+        <Image source={require('../assets/logo.png')} style={styles.markImage} resizeMode="contain" />
+      </View>
       <Text style={styles.splashTitle}>SAT GG</Text>
       <Text style={styles.splashSub}>Your score starts here</Text>
       <ActivityIndicator size="large" color={colors.gold} style={{ marginTop: 34 }} />
@@ -82,7 +106,7 @@ function makeStyles(colors: ThemeColors) {
     root: { flex: 1, backgroundColor: colors.cloud },
     splash: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.purple },
     mark: { width: 92, height: 92, borderRadius: 32, backgroundColor: colors.gold, borderBottomWidth: 7, borderBottomColor: colors.goldShadow, alignItems: 'center', justifyContent: 'center' },
-    markText: { fontWeight: '900', fontSize: 51, color: colors.ink },
+    markImage: { width: 64, height: 64 },
     splashTitle: { marginTop: 20, color: colors.white, fontWeight: '900', fontSize: 34, letterSpacing: 1.4 },
     splashSub: { marginTop: 6, color: '#DCD7FF', fontSize: 15, fontWeight: '700' },
   });

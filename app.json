@@ -10,7 +10,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.satgg.app"
+      "bundleIdentifier": "com.satgg.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -22,11 +25,15 @@
       "bundler": "metro"
     },
     "plugins": [
-      "@react-native-google-signin/google-signin",
       "expo-localization",
       "expo-video",
       "expo-secure-store",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "2dd704ed-ded7-4fbd-ac22-82cf08ccf8be"
+      }
+    }
   }
 }
