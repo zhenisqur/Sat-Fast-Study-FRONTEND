@@ -49,18 +49,11 @@ export const ONBOARDING_STEPS: StepConfig[] = [
       { value: 'false', labelEn: 'No', labelRu: 'Нет' },
     ],
   },
-  {
-    id: 'exam-timeframe',
-    type: 'single-choice',
-    field: 'examTimeframe',
-    questionEn: 'When are you planning to take the SAT?',
-    questionRu: 'Когда примерно планируешь сдавать SAT?',
-    options: [
-      { value: 'soon', labelEn: 'In the next 3 months', labelRu: 'В ближайшие 3 месяца' },
-      { value: 'half_year', labelEn: 'In about 6 months', labelRu: 'Через полгода' },
-      { value: 'year', labelEn: 'In about a year', labelRu: 'Через год' },
-      { value: 'undecided', labelEn: "Haven't decided yet", labelRu: 'Ещё не решил(-а)' },
-    ],
-  },
+  { id: 'exam-date', type: 'exam-date' },
   { id: 'study-days', type: 'study-days' },
+  { id: 'study-intensity', type: 'study-intensity' },
+  // Прошлый результат спрашиваем только у тех, кто уже сдавал (фильтр в OnboardingFlow).
+  { id: 'score-previous', type: 'score', mode: 'previous' },
+  // Желаемый результат — у всех.
+  { id: 'score-target', type: 'score', mode: 'target' },
 ];

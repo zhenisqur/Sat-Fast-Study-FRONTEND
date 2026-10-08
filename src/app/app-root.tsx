@@ -47,8 +47,18 @@ function AppRootInner() {
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
   const [onboardingAnswers, setOnboardingAnswers] = useState<OnboardingAnswers | null>(null);
 
+  // TODO: поставь false, когда закончишь гонять опросник — иначе онбординг
+  // будет сбрасываться при каждом запуске приложения.
+  const FORCE_RESET_ONBOARDING_FOR_TESTING = true;
+
   useEffect(() => {
-    AsyncStorage.getItem(ONBOARDING_DONE_KEY).then((value) => setOnboardingDone(value === 'true'));
+    (async () => {
+      if (__DEV__ && FORCE_RESET_ONBOARDING_FOR_TESTING) {
+        await AsyncStorage.removeItem(ONBOARDING_DONE_KEY);
+      }
+      const value = await AsyncStorage.getItem(ONBOARDING_DONE_KEY);
+      setOnboardingDone(value === 'true');
+    })();
   }, []);
 
   const handleOnboardingComplete = async (answers: OnboardingAnswers) => {
@@ -67,7 +77,15 @@ function AppRootInner() {
   };
 
   if (booting || onboardingDone === null) return <Splash colors={colors} />;
-  if (!onboardingDone) return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+  if (!onboardingDone) {
+    return (
+      <OnboardingFlow
+        onComplete={handleOnboardingComplete}
+        onAuthenticate={handleAuth}
+        onOAuthPress={handleOAuthPress}
+      />
+    );
+  }
   if (!session) return <AuthScreen onAuthenticate={handleAuth} onOAuthPress={handleOAuthPress} />;
   if (!api) return null;
 

@@ -78,7 +78,12 @@ export function useSession() {
         })
         .catch((e) => resolver?.reject(e instanceof Error ? e : new Error('Google sign-in failed.')));
     } else if (response.type === 'cancel' || response.type === 'dismiss') {
-      resolver?.resolve(); // юзер просто закрыл окно — это не ошибка
+      // Юзер закрыл окно. Сессии нет, поэтому это НЕ успех: иначе онбординг решит,
+      // что регистрация прошла, и дойдёт до paywall без аккаунта.
+      // Вызывающий код различает этот случай по err.name === 'OAuthCancelled' и молча остаётся на экране.
+      const cancelled = new Error('Sign-in cancelled.');
+      cancelled.name = 'OAuthCancelled';
+      resolver?.reject(cancelled);
     } else {
       resolver?.reject(new Error('Google sign-in failed.'));
     }

@@ -3,16 +3,21 @@ import { View, Text, StyleSheet } from 'react-native';
 import { useLanguage } from '../../../core/language-context';
 import { useTheme } from '../../../core/theme-context';
 import { spacing, typeScale } from '../../../core/design-tokens';
-import { SingleChoiceStepConfig } from '../types';
+import { StudyIntensity } from '../types';
 import { ChunkyOptionButton } from './ChunkyOptionButton';
-import { OptionIcon, hasOptionIcon } from './OptionIcon';
 
 interface Props {
-  config: SingleChoiceStepConfig;
-  onAnswer: (value: string) => void;
+  onConfirm: (intensity: StudyIntensity) => void;
 }
 
-export function SingleChoiceStep({ config, onAnswer }: Props) {
+const INTENSITY_OPTIONS: { key: StudyIntensity; labelRu: string; labelEn: string; subRu: string; subEn: string }[] = [
+  { key: 'light', labelRu: 'Лёгкий', labelEn: 'Light', subRu: '5 мин/день', subEn: '5 min/day' },
+  { key: 'regular', labelRu: 'Обычный', labelEn: 'Regular', subRu: '10 мин/день', subEn: '10 min/day' },
+  { key: 'serious', labelRu: 'Серьёзный', labelEn: 'Serious', subRu: '15 мин/день', subEn: '15 min/day' },
+  { key: 'intense', labelRu: 'Интенсивный', labelEn: 'Intense', subRu: '20 мин/день', subEn: '20 min/day' },
+];
+
+export function StudyIntensityStep({ onConfirm }: Props) {
   const { locale } = useLanguage();
   const { colors } = useTheme();
   const isRu = locale === 'ru';
@@ -20,21 +25,17 @@ export function SingleChoiceStep({ config, onAnswer }: Props) {
   return (
     <View style={styles.container}>
       <Text accessibilityRole="header" style={[styles.question, { color: colors.text }]}>
-        {isRu ? config.questionRu : config.questionEn}
+        {isRu ? 'Насколько интенсивно хочешь заниматься?' : 'How intense should your prep be?'}
       </Text>
 
       <View style={styles.grid}>
-        {config.options.map((option) => (
-          <View key={option.value} style={styles.cell}>
+        {INTENSITY_OPTIONS.map((option) => (
+          <View key={option.key} style={styles.cell}>
             <ChunkyOptionButton
               label={isRu ? option.labelRu : option.labelEn}
-              icon={
-                hasOptionIcon(config.field, option.value) ? (
-                  <OptionIcon field={config.field} value={option.value} />
-                ) : undefined
-              }
+              sublabel={isRu ? option.subRu : option.subEn}
               compact
-              onPress={() => onAnswer(option.value)}
+              onPress={() => onConfirm(option.key)}
             />
           </View>
         ))}

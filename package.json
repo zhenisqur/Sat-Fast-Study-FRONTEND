@@ -15,6 +15,7 @@
     "expo": "^57",
     "expo-auth-session": "~57.0.13",
     "expo-haptics": "~57.0.2",
+    "expo-linear-gradient": "~57.0.2",
     "expo-localization": "~57.0.1",
     "expo-secure-store": "~57.0.3",
     "expo-status-bar": "~57.0.1",
