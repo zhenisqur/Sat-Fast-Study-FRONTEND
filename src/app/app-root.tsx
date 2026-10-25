@@ -47,9 +47,12 @@ function AppRootInner() {
   const [onboardingDone, setOnboardingDone] = useState<boolean | null>(null);
   const [onboardingAnswers, setOnboardingAnswers] = useState<OnboardingAnswers | null>(null);
 
-  // TODO: поставь false, когда закончишь гонять опросник — иначе онбординг
-  // будет сбрасываться при каждом запуске приложения.
-  const FORCE_RESET_ONBOARDING_FOR_TESTING = true;
+  // true = опрос сбрасывается при КАЖДОМ запуске приложения (для отладки самого опроса).
+  // Обычно держим false: опрос проходится один раз, релоад его не трогает.
+  const FORCE_RESET_ONBOARDING_FOR_TESTING = false;
+  // Только в dev-сборке: выход из аккаунта кнопкой в профиле заново открывает опрос,
+  // как у нового пользователя. Так опрос можно проверить, не сбрасывая его при каждом релоаде.
+  const RESET_ONBOARDING_ON_SIGN_OUT_IN_DEV = true;
 
   useEffect(() => {
     (async () => {
@@ -67,6 +70,16 @@ function AppRootInner() {
     // сразу после первой успешной регистрации (см. архитектурное решение по онбордингу)
     await AsyncStorage.setItem(ONBOARDING_DONE_KEY, 'true');
     setOnboardingDone(true);
+  };
+
+  // Выход по кнопке из профиля. Автоматический выход при просроченном токене (внутри createApi)
+  // остаётся обычным signOut и опрос не трогает.
+  const handleSignOut = async () => {
+    await signOut();
+    if (__DEV__ && RESET_ONBOARDING_ON_SIGN_OUT_IN_DEV) {
+      await AsyncStorage.removeItem(ONBOARDING_DONE_KEY);
+      setOnboardingDone(false);
+    }
   };
 
   const refreshUser = async () => {
@@ -98,7 +111,7 @@ function AppRootInner() {
         studyVersion={studyVersion} setStudyVersion={setStudyVersion}
         progress={progress} quota={quota} setQuota={setQuota}
         dashboardError={dashboardError} refreshDashboard={refreshDashboard}
-        signOut={signOut} refreshUser={refreshUser}
+        signOut={handleSignOut} refreshUser={refreshUser}
       />
     </SafeAreaView>
   );

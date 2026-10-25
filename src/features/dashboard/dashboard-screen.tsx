@@ -1,125 +1,177 @@
-import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { ScreenHeader } from '../../components/ui';
+import React, { useMemo, useState } from 'react';
+import { Image, ImageSourcePropType, NativeScrollEvent, NativeSyntheticEvent, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../core/theme-context';
 import { ThemeColors } from '../../core/theme';
 import { haptics } from '../../core/haptics';
+import { useTabBarInset } from '../../core/tab-bar';
 import { DailyQuota, Progress, Section, User } from '../../core/types';
+import { bannerPalette, getDailyMascot } from './daily-mascot';
 
-export function DashboardScreen({ user, progress, quota, onPractice }: { user: User; progress: Progress; quota: DailyQuota; onPractice: (section: Section) => void }) {
+const DAILY_GOAL = 30;
+const QUEST_TARGET = 15;
+
+// ДЕМО: серии и XP на сервере пока нет. Когда появятся данные, заменить эти значения реальными.
+const DEMO = { streak: 3, xp: 175 };
+
+// Картинки маскотов квадратные: низ картинки совпадает с верхом тёмного блока, а у маскота обрезано туловище.
+const MASCOT_SIZE = 230;
+// Пока шапка ещё видна у верхнего края (высота 290 минус заход тёмного блока), системная строка остаётся цвета шапки.
+const STATUS_FILL_UNTIL = 240;
+
+/** Сколько часов осталось до смены дня. Квота на бэке считается по суткам UTC, поэтому считаем до полуночи UTC. */
+function hoursLeftToday(): number {
+  const now = new Date();
+  const end = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  return Math.max(1, Math.ceil((end - now.getTime()) / 3600000));
+}
+
+export function DashboardScreen({ user, quota, onPractice }: { user: User; progress: Progress; quota: DailyQuota; onPractice: (section: Section) => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const insets = useSafeAreaInsets();
+  // Маскот дня и цвета шапки под него (шапка красится в цвет фона картинки).
+  const mascot = useMemo(() => getDailyMascot(), []);
+  const palette = bannerPalette(mascot.background);
+  const scale = mascot.scale ?? 1;
+  const offsetY = mascot.offsetY ?? 0;
+  // Пока экран не прокручен, шапка продолжается под системной строкой, а иконки в ней тёмные.
+  const [atTop, setAtTop] = useState(true);
+  const handleScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const top = event.nativeEvent.contentOffset.y <= STATUS_FILL_UNTIL;
+    setAtTop((previous) => (previous === top ? previous : top));
+  };
+  // Контент прокручивается под парящую панель вкладок, поэтому снизу оставляем запас.
+  const bottomInset = useTabBarInset();
+  const firstName = (user.fullName ?? '').trim().split(' ')[0];
+  const done = quota.math + quota.readingWriting;
+  const goalFill = Math.min(1, done / DAILY_GOAL);
+
   return (
-    <ScrollView contentContainerStyle={styles.scroll}>
-      <ScreenHeader kicker="DAILY MISSION" title={`Hey, ${user.fullName.split(' ')[0]}!`} />
-      <View style={styles.hero}>
-        <View style={styles.heroIcon}>
-          <Text style={{ fontSize: 31 }}>🎯</Text>
+    <View style={styles.screen}>
+    {atTop ? <StatusBar style={palette.statusBar} /> : null}
+    {atTop ? <View style={[styles.statusFill, { top: -insets.top, height: insets.top, backgroundColor: mascot.background }]} /> : null}
+    <ScrollView
+      contentContainerStyle={{ paddingBottom: bottomInset }}
+      scrollIndicatorInsets={{ bottom: bottomInset - 16 }}
+      showsVerticalScrollIndicator={false}
+      onScroll={handleScroll}
+      scrollEventThrottle={16}
+    >
+      <View style={[styles.banner, { backgroundColor: mascot.background }]}>
+        <View style={[styles.overscrollFill, { backgroundColor: mascot.background }]} />
+        <View style={styles.mascotClip}>
+          <Image
+            source={mascot.image}
+            resizeMode="contain"
+            style={[styles.mascot, (scale !== 1 || offsetY !== 0) && { transform: [{ translateY: (-(scale - 1) * MASCOT_SIZE) / 2 + offsetY }, { scale }] }]}
+          />
         </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.heroOverline}>YOUR JOURNEY</Text>
-          <Text style={styles.heroTitle}>
-            Level {progress.overall.level}
-            <Text style={styles.heroTotal}> / {progress.overall.of}</Text>
-          </Text>
-          <Text style={styles.heroCopy}>Keep the momentum going today.</Text>
+        <Text style={[styles.kicker, { color: palette.accent }]} numberOfLines={1}>{firstName ? `ПРИВЕТ, ${firstName.toUpperCase()}` : 'ПРИВЕТ'}</Text>
+        <Text style={[styles.title, { color: palette.text }]}>{mascot.title}</Text>
+        <View style={styles.chips}>
+          <View style={styles.chip}>
+            <Ionicons name="flame" size={15} color="#FF9F43" />
+            <Text style={[styles.chipText, { color: '#FF9F43' }]}>{DEMO.streak} дня</Text>
+          </View>
+          <View style={styles.chip}>
+            <Ionicons name="flash" size={15} color={colors.gold} />
+            <Text style={[styles.chipText, { color: colors.gold }]}>{DEMO.xp} XP</Text>
+          </View>
         </View>
       </View>
-      <View style={styles.sectionRow}>
-        <Text style={styles.sectionTitle}>Today’s progress</Text>
-        <Text style={styles.tag}>{quota.math + quota.readingWriting}/30 done</Text>
+
+      <View style={styles.goal}>
+        <View style={styles.goalTop}>
+          <Text style={styles.goalTitle}>Цель дня</Text>
+          <Text style={styles.goalCount}>{done} / {DAILY_GOAL}</Text>
+        </View>
+        <View style={styles.goalRail}>
+          <View style={[styles.goalFill, { width: `${goalFill * 100}%` }]} />
+        </View>
+        <Text style={styles.goalCopy}>Выполни 30 задач за сегодня</Text>
       </View>
-      <Track colors={colors} title="Math" glyph="∑" color="#5D53BA" progress={progress.math} quota={quota.math} onPress={() => onPractice('MATH')} />
-      <Track colors={colors} title="Reading & Writing" glyph="✎" color="#9A67D6" progress={progress.readingWriting} quota={quota.readingWriting} onPress={() => onPractice('READING_WRITING')} />
-      <Text style={[styles.sectionTitle, { marginTop: 24, marginBottom: 12 }]}>Choose your practice</Text>
-      <View style={styles.grid}>
-        <PracticeTile colors={colors} glyph="∑" title="Practice Math" onPress={() => onPractice('MATH')} />
-        <PracticeTile colors={colors} glyph="Aa" title="Practice R&W" onPress={() => onPractice('READING_WRITING')} />
+
+      <View style={styles.quests}>
+        <View style={styles.questsHead}>
+          <Text style={styles.sectionLabel}>Норматив дня</Text>
+          <View style={styles.timer}>
+            <Ionicons name="time-outline" size={16} color="#FF9F43" />
+            <Text style={styles.timerText}>ОСТАЛОСЬ {hoursLeftToday()} Ч</Text>
+          </View>
+        </View>
+        <Quest colors={colors} title="Математика: 15 задач" chest={require('../../assets/mascot/math.png')} value={quota.math} onPress={() => onPractice('MATH')} />
+        <Quest colors={colors} title="Грамматика: 15 задач" chest={require('../../assets/mascot/grammar.png')} value={quota.readingWriting} onPress={() => onPractice('READING_WRITING')} last />
       </View>
     </ScrollView>
+    </View>
   );
 }
 
-function Track({ colors, title, glyph, color, progress, quota, onPress }: { colors: ThemeColors; title: string; glyph: string; color: string; progress: { level: number; of: number }; quota: number; onPress: () => void }) {
+function Quest({ colors, title, chest, value, onPress, last }: { colors: ThemeColors; title: string; chest: ImageSourcePropType; value: number; onPress: () => void; last?: boolean }) {
   const styles = makeStyles(colors);
+  const finished = value >= QUEST_TARGET;
+  const fill = Math.min(1, value / QUEST_TARGET);
   const handlePress = () => {
     haptics.select();
     onPress();
   };
   return (
-    <Pressable onPress={handlePress} style={styles.track}>
-      <View style={[styles.trackIcon, { backgroundColor: color }]}>
-        <Text style={styles.trackGlyph}>{glyph}</Text>
-      </View>
+    <Pressable onPress={handlePress} style={({ pressed }) => [styles.quest, !last && styles.questDivider, pressed && styles.questPressed]}>
       <View style={{ flex: 1 }}>
-        <View style={styles.trackTop}>
-          <Text style={styles.trackTitle}>{title}</Text>
-          <Text style={styles.level}>
-            {progress.level}/{progress.of}
-          </Text>
-        </View>
+        <Text style={styles.questTitle} numberOfLines={1}>{title}</Text>
         <View style={styles.rail}>
-          <View style={[styles.fill, { width: `${(progress.level / progress.of) * 100}%`, backgroundColor: color }]} />
+          <View style={[styles.railFill, { width: `${fill * 100}%` }]} />
+          <View style={styles.railLabelWrap}>
+            <Text style={styles.railLabel}>{finished ? 'Готово' : `${value} / ${QUEST_TARGET}`}</Text>
+          </View>
         </View>
-        <Text style={styles.quota}>{quota}/15 completed today</Text>
       </View>
-      <Text style={styles.arrow}>›</Text>
+      <Image source={chest} resizeMode="contain" style={[styles.chest, finished && styles.chestDone]} />
     </Pressable>
-  );
-}
-
-function PracticeTile({ colors, glyph, title, onPress }: { colors: ThemeColors; glyph: string; title: string; onPress: () => void }) {
-  const styles = makeStyles(colors);
-  const handlePress = () => {
-    haptics.tap();
-    onPress();
-  };
-  return (
-    <View style={styles.tile}>
-      <View style={styles.tileIcon}>
-        <Text style={styles.tileGlyph}>{glyph}</Text>
-      </View>
-      <Text style={styles.tileTitle}>{title}</Text>
-      <Text style={styles.tileSub}>15 questions</Text>
-      <Pressable onPress={handlePress} style={({ pressed }) => [styles.tileButton, pressed && styles.tileButtonPressed]}>
-        <Text style={styles.tileButtonText}>Start</Text>
-        <Text style={styles.tileButtonArrow}>→</Text>
-      </Pressable>
-    </View>
   );
 }
 
 function makeStyles(colors: ThemeColors) {
   return StyleSheet.create({
-    scroll: { padding: 22, paddingTop: 31, paddingBottom: 28 },
-    hero: { backgroundColor: colors.purple, borderRadius: 25, padding: 20, flexDirection: 'row', gap: 16 },
-    heroIcon: { width: 61, height: 61, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#897DDD' },
-    heroOverline: { color: colors.gold, fontWeight: '900', fontSize: 10, letterSpacing: 1.2 },
-    heroTitle: { color: colors.white, fontSize: 29, fontWeight: '900', marginTop: 2 },
-    heroTotal: { color: '#C9C3F3', fontSize: 17 },
-    heroCopy: { color: '#E0DCFF', fontWeight: '600', marginTop: 3, fontSize: 13 },
-    sectionRow: { marginTop: 27, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 },
-    sectionTitle: { color: colors.text, fontSize: 18, fontWeight: '900' },
-    tag: { color: colors.purple, backgroundColor: colors.lavender, borderRadius: 9, paddingVertical: 4, paddingHorizontal: 7, fontWeight: '800', fontSize: 11 },
-    track: { backgroundColor: colors.white, borderRadius: 18, marginBottom: 12, padding: 13, paddingRight: 11, flexDirection: 'row', alignItems: 'center', borderColor: colors.line, borderWidth: 1.2, gap: 12 },
-    trackIcon: { height: 46, width: 46, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-    trackGlyph: { color: colors.white, fontSize: 22, fontWeight: '900' },
-    trackTop: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 7 },
-    trackTitle: { color: colors.text, fontWeight: '900', fontSize: 14 },
-    level: { color: colors.purple, fontWeight: '900', fontSize: 13 },
-    rail: { height: 8, borderRadius: 20, backgroundColor: colors.line, overflow: 'hidden' },
-    fill: { height: '100%', borderRadius: 20 },
-    quota: { color: colors.muted, fontWeight: '700', fontSize: 11, marginTop: 6 },
-    arrow: { color: colors.muted, fontSize: 29 },
-    grid: { flexDirection: 'row', gap: 12 },
-    tile: { flex: 1, minHeight: 176, borderRadius: 20, padding: 15, backgroundColor: colors.white, borderWidth: 1.2, borderColor: colors.line, justifyContent: 'space-between' },
-    tileIcon: { width: 39, height: 39, borderRadius: 13, backgroundColor: colors.lavender, alignItems: 'center', justifyContent: 'center', marginBottom: 13 },
-    tileGlyph: { color: colors.purple, fontSize: 19, fontWeight: '900' },
-    tileTitle: { color: colors.text, fontWeight: '900', fontSize: 14 },
-    tileSub: { color: colors.muted, fontSize: 12, fontWeight: '600', marginTop: 5 },
-    tileButton: { marginTop: 14, backgroundColor: colors.purple, borderRadius: 13, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
-    tileButtonPressed: { opacity: 0.85, transform: [{ translateY: 1 }] },
-    tileButtonText: { color: colors.white, fontWeight: '900', fontSize: 13 },
-    tileButtonArrow: { color: colors.white, fontWeight: '900', fontSize: 14 },
+    screen: { flex: 1 },
+    // Если потянуть экран вниз, над шапкой появляется пустое место: закрашиваем его тем же жёлтым.
+    overscrollFill: { position: 'absolute', left: 0, right: 0, top: -1200, height: 1200 },
+    statusFill: { position: 'absolute', left: 0, right: 0 },
+    banner: { height: 290, paddingTop: 18, paddingHorizontal: 20 },
+    kicker: { fontSize: 22, fontWeight: '900', letterSpacing: 1 },
+    title: { width: 170, marginTop: 6, fontSize: 30, lineHeight: 33, fontWeight: '900' },
+    chips: { flexDirection: 'row', gap: 8, marginTop: 16 },
+    chip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 5, paddingHorizontal: 9, borderRadius: 12, backgroundColor: colors.ink },
+    chipText: { fontSize: 13, fontWeight: '900' },
+    // Обрезаем всё, что у увеличенной картинки выходит за шапку, иначе оно просвечивает ниже тёмного блока.
+    mascotClip: { ...StyleSheet.absoluteFill, overflow: 'hidden', pointerEvents: 'none' },
+    mascot: { position: 'absolute', right: -4, bottom: 26, width: MASCOT_SIZE, height: MASCOT_SIZE, pointerEvents: 'none' },
+
+    goal: { marginTop: -34, paddingTop: 22, paddingBottom: 4, paddingHorizontal: 20, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: colors.cloud },
+    goalTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    goalTitle: { color: colors.text, fontSize: 19, fontWeight: '900' },
+    goalCount: { color: colors.text, fontSize: 15, fontWeight: '900' },
+    goalRail: { height: 18, marginTop: 12, borderRadius: 9, backgroundColor: '#4B4372', overflow: 'hidden' },
+    goalFill: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.gold },
+    goalCopy: { marginTop: 10, color: colors.muted, fontSize: 14, fontWeight: '800' },
+
+    quests: { marginTop: 30, paddingHorizontal: 16 },
+    questsHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    sectionLabel: { color: colors.muted, fontSize: 13, fontWeight: '800', letterSpacing: 1.1 },
+    timer: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    timerText: { color: '#FF9F43', fontSize: 13, fontWeight: '900' },
+    quest: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 18 },
+    questDivider: { borderBottomWidth: 2, borderBottomColor: colors.line },
+    questPressed: { opacity: 0.85 },
+    questTitle: { color: colors.text, fontSize: 17, fontWeight: '900' },
+    rail: { height: 18, marginTop: 12, borderRadius: 9, backgroundColor: '#4B4372', overflow: 'hidden' },
+    railFill: { minWidth: 18, height: 18, borderRadius: 9, backgroundColor: colors.purple },
+    railLabelWrap: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+    railLabel: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+    chest: { width: 76, height: 76 },
+    chestDone: { opacity: 0.55 },
   });
 }

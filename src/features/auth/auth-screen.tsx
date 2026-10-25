@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { GoogleLogo } from '../../components/uis/GoogleLogo';
@@ -22,8 +22,6 @@ export function AuthScreen({ onAuthenticate, onOAuthPress }: AuthScreenProps) {
   const [password, setPassword] = useState('satmaster');
   const [fullName, setFullName] = useState('');
   const [age, setAge] = useState('');
-  const [hasTakenSatBefore, setHasTakenSatBefore] = useState(false);
-  const [previousSatScore, setPreviousSatScore] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [oauthBusy, setOauthBusy] = useState<'GOOGLE' | 'APPLE' | null>(null);
@@ -37,9 +35,8 @@ export function AuthScreen({ onAuthenticate, onOAuthPress }: AuthScreenProps) {
       const ageNumber = Number(age);
       if (!fullName.trim()) return setError('Tell us your name.');
       if (!Number.isInteger(ageNumber) || ageNumber < 1) return setError('Enter your age using digits only.');
-      if (hasTakenSatBefore && (!Number(previousSatScore) || Number(previousSatScore) < 400 || Number(previousSatScore) > 1600)) return setError('Previous SAT score must be from 400 to 1600.');
-      Object.assign(payload, { fullName: fullName.trim(), age: ageNumber, hasTakenSatBefore });
-      if (hasTakenSatBefore) payload.previousSatScore = Number(previousSatScore);
+      // «Сдавал ли SAT раньше» и прошлый балл уже спрашиваются в опросе, здесь их не дублируем.
+      Object.assign(payload, { fullName: fullName.trim(), age: ageNumber });
     }
     setError('');
     setBusy(true);
@@ -87,32 +84,6 @@ export function AuthScreen({ onAuthenticate, onOAuthPress }: AuthScreenProps) {
                 <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
                 <Field label="Password" hint="Minimum 8 characters" value={password} onChangeText={setPassword} secureTextEntry />
                 <Field label="Age" value={age} onChangeText={(value) => setAge(value.replace(/[^0-9]/g, ''))} keyboardType="number-pad" />
-
-                <View style={styles.toggle}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.toggleTitle}>Taken the SAT before?</Text>
-                    <Text style={styles.toggleHint}>We’ll tailor your start point.</Text>
-                  </View>
-                  <View style={styles.switchWrap}>
-                    <Switch
-                      value={hasTakenSatBefore}
-                      onValueChange={setHasTakenSatBefore}
-                      trackColor={{ false: '#B8B2D8', true: colors.gold }}
-                      thumbColor={colors.white}
-                      ios_backgroundColor="#B8B2D8"
-                    />
-                  </View>
-                </View>
-
-                {hasTakenSatBefore ? (
-                  <Field
-                    label="Previous SAT score"
-                    hint="400–1600"
-                    value={previousSatScore}
-                    onChangeText={(value) => setPreviousSatScore(value.replace(/[^0-9]/g, ''))}
-                    keyboardType="number-pad"
-                  />
-                ) : null}
               </>
             ) : (
               <>
@@ -172,10 +143,6 @@ function makeStyles(colors: ThemeColors) {
     subtitle: { fontSize: 15, color: '#E3DFFF', lineHeight: 22, marginTop: 8 },
     card: { flex: 1, backgroundColor: colors.cloud, borderTopLeftRadius: 30, borderTopRightRadius: 30, overflow: 'hidden' },
     cardContent: { padding: 24, flexGrow: 1 },
-    toggle: { minHeight: 66, borderRadius: 15, borderColor: colors.line, borderWidth: 1.5, backgroundColor: colors.white, paddingHorizontal: 14, marginBottom: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
-    switchWrap: { width: 51, height: 31, alignItems: 'center', justifyContent: 'center' },
-    toggleTitle: { color: colors.text, fontWeight: '800', fontSize: 14 },
-    toggleHint: { color: colors.muted, fontSize: 12, marginTop: 3 },
     error: { color: '#C53D51', fontWeight: '700', fontSize: 13, marginBottom: 13 },
     divider: { flexDirection: 'row', alignItems: 'center', marginVertical: 18, gap: 10 },
     dividerLine: { flex: 1, height: 1, backgroundColor: colors.line },

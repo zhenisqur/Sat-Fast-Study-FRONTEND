@@ -45,7 +45,7 @@ export const darkColors: ThemeColors = {
   mintDeep: '#239B69',
   coral: '#FF7A8A',
   coralDeep: '#D9576A',
-  cloud: '#14101F',
+  cloud: '#161223', // фон как у маскота (раньше был #14101F)
   white: '#231C3B',
   lavender: '#241E44',
   line: '#372F58',
