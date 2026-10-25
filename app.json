@@ -5,9 +5,6 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "splash": {
-      "backgroundColor": "#6A5ACD"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.satgg.app",
@@ -28,7 +25,14 @@
       "expo-localization",
       "expo-video",
       "expo-secure-store",
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-font",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#6A5ACD"
+        }
+      ]
     ],
     "extra": {
       "eas": {
